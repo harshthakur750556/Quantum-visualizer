@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Quantum Visualizer — explore atomic shells and orbitals in an interactive 3D experience.">
+  <meta http-equiv="refresh" content="8;url=atom.html">
+  <title>Quantum Visualizer | Explore the Atom</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root { color-scheme: dark; --ink:#eef4ff; --muted:#94a4bf; --line:rgba(206,225,255,.15); --cyan:#73f2df; --violet:#9d8cff; }
+    * { box-sizing:border-box; }
+    html, body { min-height:100%; margin:0; }
+    body { overflow-x:hidden; color:var(--ink); background:#070914; font-family:'Space Grotesk',system-ui,sans-serif; }
+    body::before { content:''; position:fixed; inset:0; z-index:-2; background:radial-gradient(circle at 50% 42%, rgba(48,86,170,.24), transparent 30%), radial-gradient(circle at 85% 5%, rgba(157,140,255,.14), transparent 27%), #070914; }
+    body::after { content:''; position:fixed; inset:0; z-index:-1; opacity:.45; pointer-events:none; background-image:linear-gradient(rgba(255,255,255,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.025) 1px,transparent 1px); background-size:48px 48px; mask-image:linear-gradient(to bottom,black,transparent 80%); }
+    .wrap { width:min(1120px, calc(100% - 40px)); margin:auto; }
+    nav { display:flex; align-items:center; justify-content:space-between; padding:28px 0; }
+    .brand { display:flex; align-items:center; gap:11px; color:var(--ink); text-decoration:none; font-weight:600; letter-spacing:.02em; }
+    .mark { display:grid; place-items:center; width:34px; height:34px; border:1px solid rgba(115,242,223,.5); border-radius:50%; color:var(--cyan); box-shadow:0 0 24px rgba(115,242,223,.2); font-size:19px; }
+    .status { color:var(--muted); font:11px 'DM Mono',monospace; letter-spacing:.12em; text-transform:uppercase; }
+    main { display:grid; grid-template-columns:1.05fr .95fr; align-items:center; gap:7vw; min-height:calc(100vh - 100px); padding:35px 0 90px; }
+    .eyebrow { display:flex; align-items:center; gap:10px; color:var(--cyan); font:12px 'DM Mono',monospace; letter-spacing:.14em; text-transform:uppercase; }
+    .eyebrow::before { content:''; width:30px; height:1px; background:var(--cyan); }
+    h1 { max-width:650px; margin:22px 0; font-size:clamp(3.1rem, 7vw, 6.9rem); line-height:.91; letter-spacing:-.075em; font-weight:600; }
+    h1 span { color:transparent; -webkit-text-stroke:1px rgba(238,244,255,.5); }
+    .intro { max-width:530px; margin:0 0 32px; color:var(--muted); font-size:18px; line-height:1.65; }
+    .actions { display:flex; flex-wrap:wrap; align-items:center; gap:17px; }
+    .launch { display:inline-flex; align-items:center; gap:13px; padding:15px 21px; border:1px solid var(--cyan); border-radius:8px; color:#061716; background:var(--cyan); text-decoration:none; font-weight:700; transition:transform .2s, box-shadow .2s; }
+    .launch:hover { transform:translateY(-3px); box-shadow:0 12px 30px rgba(115,242,223,.23); }
+    .countdown { color:var(--muted); font:12px 'DM Mono',monospace; }
+    .orbit-card { position:relative; display:grid; place-items:center; min-height:480px; border:1px solid var(--line); border-radius:24px; background:linear-gradient(145deg,rgba(20,29,59,.72),rgba(10,13,28,.5)); box-shadow:inset 0 1px rgba(255,255,255,.06), 0 25px 70px rgba(0,0,0,.3); overflow:hidden; }
+    .orbit-card::before, .orbit-card::after { content:''; position:absolute; width:74%; aspect-ratio:1; border:1px solid rgba(115,242,223,.3); border-radius:50%; transform:rotate(57deg) skewX(12deg); box-shadow:0 0 35px rgba(115,242,223,.13); }
+    .orbit-card::after { width:54%; transform:rotate(-35deg) skewX(-15deg); border-color:rgba(157,140,255,.38); }
+    .atom { position:relative; z-index:1; display:grid; place-items:center; width:82px; height:82px; border-radius:50%; color:#fff; font-size:30px; background:radial-gradient(circle at 35% 30%,#fff1c4,#ff9d68 22%,#b44762 55%,#37183d 75%); box-shadow:0 0 30px #ff8e6570, 0 0 100px #a24c8870; animation:pulse 3s ease-in-out infinite; }
+    .card-label { position:absolute; right:22px; bottom:20px; left:22px; display:flex; justify-content:space-between; color:var(--muted); font:11px 'DM Mono',monospace; letter-spacing:.08em; text-transform:uppercase; }
+    .features { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-top:75px; }
+    .feature { padding:18px; border:1px solid var(--line); border-radius:12px; background:rgba(255,255,255,.025); }
+    .feature b { display:block; margin-bottom:6px; font-size:14px; }
+    .feature p { margin:0; color:var(--muted); font-size:12px; line-height:1.5; }
+    @keyframes pulse { 50% { transform:scale(1.08); box-shadow:0 0 42px #ff8e65a0,0 0 125px #a24c8870; } }
+    @media (max-width:760px) { .wrap{width:min(100% - 28px,560px)} nav{padding:20px 0} .status{display:none} main{display:block; min-height:0; padding:55px 0 45px} h1{font-size:clamp(3.5rem,17vw,6rem)} .intro{font-size:16px} .orbit-card{min-height:330px; margin-top:55px} .features{margin-top:35px; grid-template-columns:1fr} }
+    @media (prefers-reduced-motion:reduce) { *,*::before,*::after{animation:none!important;transition:none!important} }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <nav aria-label="Primary navigation">
+      <a class="brand" href="atom.html"><span class="mark">⚛</span> Quantum Visualizer</a>
+      <span class="status">interactive / educational / open</span>
+    </nav>
+    <main>
+      <section>
+        <div class="eyebrow">A window into the microscopic</div>
+        <h1>See the <span>invisible</span>.</h1>
+        <p class="intro">Explore atomic structure through a responsive 3D visualizer. Move from familiar electron shells to probability clouds and discover the quantum numbers behind them.</p>
+        <div class="actions">
+          <a class="launch" href="atom.html">Launch explorer <span aria-hidden="true">↗</span></a>
+          <span class="countdown">Opening automatically in <span id="seconds">8</span>s</span>
+        </div>
+        <div class="features" aria-label="Features">
+          <div class="feature"><b>Shells &amp; orbitals</b><p>Switch between two complementary views of an atom.</p></div>
+          <div class="feature"><b>Elements 1–36</b><p>Compare configurations from hydrogen to krypton.</p></div>
+          <div class="feature"><b>Learn by doing</b><p>Inspect spins, nodes, phases, and quantum numbers.</p></div>
+        </div>
+      </section>
+      <aside class="orbit-card" aria-label="Animated atomic illustration">
+        <div class="atom" aria-hidden="true">✦</div>
+        <div class="card-label"><span>Quantum field 01</span><span>Probability / motion</span></div>
+      </aside>
+    </main>
+  </div>
+  <script>
+    let remaining = 8;
+    const seconds = document.getElementById('seconds');
+    const timer = setInterval(() => {
+      remaining -= 1;
+      seconds.textContent = remaining;
+      if (remaining <= 0) clearInterval(timer);
+    }, 1000);
+  </script>
+</body>
+</html>
