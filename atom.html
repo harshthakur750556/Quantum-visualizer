@@ -1,0 +1,907 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Atomic Orbital Explorer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<style>
+  :root, :root:not([data-theme="light"]), :root[data-theme="dark"]{
+    --bg:#05070d;
+    --bg-2:#080c17;
+    --panel:#0b1020ee;
+    --panel-solid:#0b1020;
+    --panel-2:#111a30;
+    --border:rgba(255,255,255,0.09);
+    --border-strong:rgba(255,255,255,0.16);
+    --text:#e9edf5;
+    --text-muted:#8b93a9;
+    --text-dim:#5b6478;
+    --accent:#5ee6d9;
+    --accent-soft:#5ee6d933;
+    --pos:#4c8dff;
+    --neg:#ff7a59;
+    --spin-up:#ffd166;
+    --spin-down:#b892ff;
+    --font-display:'Space Grotesk', system-ui, sans-serif;
+    --font-body:'Inter', system-ui, sans-serif;
+    --radius-lg:18px;
+    --radius-md:12px;
+    --radius-sm:8px;
+    color-scheme: dark;
+  }
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body{ height:100%; margin:0; overscroll-behavior:none; }
+  html{ scroll-padding-top: env(safe-area-inset-top,0px); }
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:var(--font-body);
+    overflow:hidden;
+    padding-top:env(safe-area-inset-top,0px);
+    padding-bottom:env(safe-area-inset-bottom,0px);
+  }
+  #app{ position:relative; height:100%; width:100%; display:flex; flex-direction:column; }
+
+  /* header */
+  #header{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:12px 16px; gap:10px;
+    background:linear-gradient(180deg, rgba(5,7,13,0.92), rgba(5,7,13,0));
+    position:relative; z-index:5;
+  }
+  #titleblock{ display:flex; align-items:baseline; gap:9px; min-width:0; }
+  #titleblock h1{
+    font-family:var(--font-display); font-weight:600; font-size:17px; margin:0;
+    letter-spacing:0.01em; white-space:nowrap;
+  }
+  #titleblock .sub{ color:var(--text-muted); font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  #infoBtn{
+    width:32px; height:32px; border-radius:50%; border:1px solid var(--border-strong);
+    background:var(--panel-2); color:var(--text); font-family:var(--font-display);
+    font-size:14px; display:flex; align-items:center; justify-content:center; flex:0 0 auto;
+    cursor:pointer;
+  }
+  #infoBtn:active{ background:var(--accent-soft); }
+
+  /* canvas */
+  #stage{ position:relative; flex:1 1 auto; min-height:0; touch-action:none; }
+  #stage canvas{ position:absolute; inset:0; display:block; width:100%; height:100%; }
+  #hint{
+    position:absolute; left:50%; bottom:10px; transform:translateX(-50%);
+    font-size:11px; color:var(--text-dim); background:rgba(5,7,13,0.55);
+    padding:5px 10px; border-radius:20px; pointer-events:none; white-space:nowrap;
+    border:1px solid var(--border);
+  }
+  #nodeReadout{
+    position:absolute; top:12px; left:12px; font-family:var(--font-display);
+    font-size:11px; color:var(--text-muted); background:rgba(5,7,13,0.5);
+    padding:6px 10px; border-radius:10px; border:1px solid var(--border);
+    line-height:1.5; pointer-events:none; max-width:62%;
+  }
+  #nodeReadout b{ color:var(--text); font-weight:600; }
+  #nodeReadout .legendRow{ display:flex; align-items:center; gap:6px; margin-top:3px; }
+  #nodeReadout .swatch{ width:9px; height:9px; border-radius:50%; flex:0 0 auto; }
+
+  /* control panel */
+  #panel{
+    position:relative; z-index:5; background:var(--panel-solid);
+    border-top:1px solid var(--border); border-radius:var(--radius-lg) var(--radius-lg) 0 0;
+    margin-top:-16px; padding:14px 14px calc(12px + env(safe-area-inset-bottom,0px));
+    box-shadow:0 -12px 30px rgba(0,0,0,0.35);
+  }
+  .grabber{ width:36px; height:4px; border-radius:4px; background:var(--border-strong); margin:0 auto 12px; }
+
+  .sectionLabel{
+    font-family:var(--font-display); font-size:11px; letter-spacing:0.04em;
+    color:var(--text-muted); margin:0 0 8px 2px; font-weight:500;
+  }
+
+  #elementRow{
+    display:flex; gap:6px; overflow-x:auto; padding-bottom:10px; margin-bottom:10px;
+    border-bottom:1px solid var(--border); scrollbar-width:none;
+  }
+  #elementRow::-webkit-scrollbar{ display:none; }
+  .elChip{
+    flex:0 0 auto; min-width:44px; padding:6px 4px; border-radius:var(--radius-sm);
+    border:1px solid var(--border); background:var(--panel-2); color:var(--text);
+    text-align:center; cursor:pointer; font-family:var(--font-display);
+  }
+  .elChip .sym{ font-size:14px; font-weight:600; display:block; line-height:1.15; }
+  .elChip .z{ font-size:9px; color:var(--text-dim); display:block; }
+  .elChip.active{ background:var(--accent); border-color:var(--accent); color:#04211d; }
+  .elChip.active .z{ color:#0a3630; }
+
+  #viewToggle{
+    display:flex; gap:6px; background:var(--panel-2); padding:4px; border-radius:var(--radius-md);
+    margin-bottom:12px; border:1px solid var(--border);
+  }
+  #viewToggle button{
+    flex:1; border:none; background:transparent; color:var(--text-muted);
+    font-family:var(--font-display); font-size:12.5px; font-weight:500; padding:9px 8px;
+    border-radius:var(--radius-sm); cursor:pointer;
+  }
+  #viewToggle button.active{ background:var(--accent); color:#04211d; }
+
+  #configLine{
+    font-family:var(--font-body); font-size:12.5px; color:var(--text-muted); margin-bottom:8px;
+  }
+  #configLine b{ color:var(--text); font-weight:600; }
+
+  #subshellRow, #orbitalRow{
+    display:flex; gap:6px; overflow-x:auto; scrollbar-width:none; padding-bottom:2px;
+  }
+  #subshellRow::-webkit-scrollbar, #orbitalRow::-webkit-scrollbar{ display:none; }
+  .subChip{
+    flex:0 0 auto; padding:8px 12px; border-radius:20px; border:1px solid var(--border-strong);
+    background:var(--panel-2); color:var(--text); font-family:var(--font-body); font-size:12.5px;
+    font-weight:600; cursor:pointer; white-space:nowrap;
+  }
+  .subChip .sup{ font-size:9px; vertical-align:super; color:var(--text-muted); margin-left:1px; }
+  .subChip.active{ background:var(--accent-soft); border-color:var(--accent); color:var(--accent); }
+  .subChip.active .sup{ color:var(--accent); }
+
+  #orbitalRow{ margin-top:8px; display:none; }
+  .orbChip{
+    flex:0 0 auto; padding:6px 10px; border-radius:20px; border:1px solid var(--border);
+    background:transparent; color:var(--text-muted); font-family:var(--font-display); font-size:11.5px;
+    cursor:pointer; white-space:nowrap;
+  }
+  .orbChip.active{ background:var(--panel-2); color:var(--text); border-color:var(--border-strong); }
+  .orbChip .dot{ display:inline-block; width:6px; height:6px; border-radius:50%; margin-right:5px; }
+  .orbChip.empty{ opacity:0.55; }
+
+  /* info drawer */
+  #infoDrawer{
+    position:absolute; inset:0; z-index:20; background:rgba(5,7,13,0.72);
+    backdrop-filter:blur(2px); display:none; align-items:flex-end;
+  }
+  #infoDrawer.open{ display:flex; }
+  #infoSheet{
+    width:100%; max-height:82%; overflow-y:auto; background:var(--panel-solid);
+    border-radius:var(--radius-lg) var(--radius-lg) 0 0; border-top:1px solid var(--border-strong);
+    padding:16px 18px calc(20px + env(safe-area-inset-bottom,0px));
+  }
+  #infoSheet h2{ font-family:var(--font-display); font-size:16px; margin:2px 0 10px; }
+  #infoSheet h3{ font-family:var(--font-display); font-size:12.5px; color:var(--accent); margin:18px 0 8px; letter-spacing:0.02em; }
+  #infoSheet p{ font-size:13px; line-height:1.55; color:var(--text-muted); margin:0 0 10px; }
+  #infoSheet .closeRow{ display:flex; justify-content:flex-end; }
+  #closeInfo{
+    border:1px solid var(--border-strong); background:var(--panel-2); color:var(--text);
+    font-family:var(--font-display); font-size:12px; padding:7px 14px; border-radius:20px; cursor:pointer;
+  }
+  table.qtable{ width:100%; border-collapse:collapse; font-size:12px; margin-top:4px; }
+  table.qtable th, table.qtable td{
+    text-align:left; padding:6px 8px; border-bottom:1px solid var(--border); font-variant-numeric:tabular-nums;
+  }
+  table.qtable th{ color:var(--text-dim); font-weight:500; font-family:var(--font-display); font-size:10.5px; letter-spacing:0.03em; }
+  .legendItem{ display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--text-muted); margin-bottom:6px; }
+  .legendItem .sw{ width:12px; height:12px; border-radius:50%; flex:0 0 auto; }
+  .legendItem .sw.arrowUp, .legendItem .sw.arrowDown{ border-radius:3px; }
+
+  @media (min-width: 860px){
+    #app{ flex-direction:row; }
+    #stage{ flex:1 1 auto; }
+    #panel{
+      flex:0 0 340px; margin-top:0; border-radius:0; border-top:none; border-left:1px solid var(--border);
+      overflow-y:auto; box-shadow:none;
+    }
+    .grabber{ display:none; }
+    #infoDrawer{ align-items:center; justify-content:center; }
+    #infoSheet{ max-width:480px; border-radius:var(--radius-lg); max-height:80vh; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <div id="stageWrap" style="display:contents;">
+    <div id="stage">
+      <div id="header" style="position:absolute; top:0; left:0; right:0;">
+        <div id="titleblock">
+          <h1>⚛ Atomic Orbital Explorer</h1>
+        </div>
+        <button id="infoBtn" aria-label="About this model">i</button>
+      </div>
+      <div id="nodeReadout"></div>
+      <div id="hint">drag to rotate · pinch / scroll to zoom</div>
+    </div>
+  </div>
+
+  <div id="panel">
+    <div class="grabber"></div>
+
+    <div class="sectionLabel">ELEMENT</div>
+    <div id="elementRow"></div>
+
+    <div id="viewToggle">
+      <button id="btnShells" class="active">Shells</button>
+      <button id="btnOrbitals">Orbitals</button>
+    </div>
+
+    <div id="configLine"></div>
+    <div id="subshellRow"></div>
+    <div id="orbitalRow"></div>
+  </div>
+
+  <div id="infoDrawer">
+    <div id="infoSheet">
+      <div class="closeRow"><button id="closeInfo">Close</button></div>
+      <h2>What this model shows</h2>
+      <p>Each element's electrons are placed using the Aufbau principle, Hund's rule (unpaired electrons fill degenerate orbitals before pairing), and the Pauli exclusion principle (max 2 electrons per orbital, opposite spin). Orbital shapes and sizes come from actual hydrogen-like wavefunctions solved for an <b style="color:var(--text)">effective nuclear charge</b> computed with Slater's shielding rules — heavier, more-screened electrons genuinely render as larger, more diffuse clouds.</p>
+
+      <h3>Shells view</h3>
+      <p>A schematic Bohr-style map: each ring is a principal shell n, electrons sit on it as small spheres. This is <i>not</i> a literal orbit — real electrons don't circle the nucleus like planets — it's a way to see shell occupancy and spin pairing at a glance.</p>
+
+      <h3>Orbitals view</h3>
+      <p>Each point is a Monte-Carlo sample of |ψ|², so the cloud density you see is the actual electron probability distribution. Point color shows the sign of the wavefunction (phase), which is why some lobes are blue and others coral — and why you can spot radial nodes as gaps between shells of the same orbital.</p>
+
+      <h3>Legend</h3>
+      <div class="legendItem"><span class="sw" style="background:var(--pos)"></span> Positive lobe (ψ &gt; 0)</div>
+      <div class="legendItem"><span class="sw" style="background:var(--neg)"></span> Negative lobe (ψ &lt; 0)</div>
+      <div class="legendItem"><span class="sw" style="background:var(--spin-up)"></span> Spin up, m<sub>s</sub> = +½</div>
+      <div class="legendItem"><span class="sw" style="background:var(--spin-down)"></span> Spin down, m<sub>s</sub> = −½</div>
+
+      <h3>Quantum numbers — current selection</h3>
+      <div id="qnumWrap"><p style="margin:0">Select a subshell to see its electrons listed here.</p></div>
+
+      <h3>Model limits, honestly</h3>
+      <p>This uses hydrogen-like orbitals with Slater screening, the standard classroom approximation — real multi-electron wavefunctions are correlated and not exactly separable this way. Elements are supported up to Z = 36 (Krypton); f-orbitals aren't included.</p>
+    </div>
+  </div>
+
+</div>
+
+<script>
+(function(){
+"use strict";
+
+/* ============================== DATA ============================== */
+
+const ELEMENTS = [
+  [1,"H","Hydrogen"],[2,"He","Helium"],[3,"Li","Lithium"],[4,"Be","Beryllium"],
+  [5,"B","Boron"],[6,"C","Carbon"],[7,"N","Nitrogen"],[8,"O","Oxygen"],
+  [9,"F","Fluorine"],[10,"Ne","Neon"],[11,"Na","Sodium"],[12,"Mg","Magnesium"],
+  [13,"Al","Aluminium"],[14,"Si","Silicon"],[15,"P","Phosphorus"],[16,"S","Sulfur"],
+  [17,"Cl","Chlorine"],[18,"Ar","Argon"],[19,"K","Potassium"],[20,"Ca","Calcium"],
+  [21,"Sc","Scandium"],[22,"Ti","Titanium"],[23,"V","Vanadium"],[24,"Cr","Chromium"],
+  [25,"Mn","Manganese"],[26,"Fe","Iron"],[27,"Co","Cobalt"],[28,"Ni","Nickel"],
+  [29,"Cu","Copper"],[30,"Zn","Zinc"],[31,"Ga","Gallium"],[32,"Ge","Germanium"],
+  [33,"As","Arsenic"],[34,"Se","Selenium"],[35,"Br","Bromine"],[36,"Kr","Krypton"]
+];
+
+const AUFBAU = [
+  {n:1,l:0,label:"1s",cap:2},
+  {n:2,l:0,label:"2s",cap:2},
+  {n:2,l:1,label:"2p",cap:6},
+  {n:3,l:0,label:"3s",cap:2},
+  {n:3,l:1,label:"3p",cap:6},
+  {n:4,l:0,label:"4s",cap:2},
+  {n:3,l:2,label:"3d",cap:10},
+  {n:4,l:1,label:"4p",cap:6}
+];
+
+function buildConfig(Z){
+  let remaining = Z;
+  const counts = AUFBAU.map(s=>{
+    const e = Math.max(0, Math.min(s.cap, remaining));
+    remaining -= e;
+    return e;
+  });
+  const idx = label => AUFBAU.findIndex(s=>s.label===label);
+  if (Z===24){ counts[idx("4s")]=1; counts[idx("3d")]=5; }
+  if (Z===29){ counts[idx("4s")]=1; counts[idx("3d")]=10; }
+  return AUFBAU.map((s,i)=>({...s, count:counts[i]})).filter(s=>s.count>0);
+}
+
+/* Hund's-rule orbital + spin assignment within a subshell */
+function assignOrbitals(l, count){
+  const m = 2*l+1;
+  const slots = new Array(m).fill(null).map(()=>[]); // each holds spins present
+  let left = count;
+  for (let pass=0; pass<2 && left>0; pass++){
+    for (let i=0;i<m && left>0;i++){
+      if (pass===0){ slots[i].push(1); left--; }
+      else if (slots[i].length===1){ slots[i].push(-1); left--; }
+    }
+  }
+  return slots; // slots[i] = [] | [+1] | [+1,-1]  ; i indexes ml = -l..l
+}
+
+/* ============================== SLATER Z_eff ============================== */
+
+const GROUPS = ["1s","2sp","3sp","3d","4sp"];
+function groupKeyFor(n,l){
+  if (l>=2) return `${n}d`;
+  if (n===1) return "1s";
+  return `${n}sp`;
+}
+
+function groupCounts(config){
+  const c = {"1s":0,"2sp":0,"3sp":0,"3d":0,"4sp":0};
+  config.forEach(s=>{ c[groupKeyFor(s.n,s.l)] += s.count; });
+  return c;
+}
+
+function zEffFor(n,l,Z,counts){
+  const gk = groupKeyFor(n,l);
+  const idx = GROUPS.indexOf(gk);
+  let sigma = 0;
+  const same = Math.max(0, counts[gk]-1);
+  sigma += (gk==="1s" ? 0.30 : 0.35) * same;
+  if (gk.endsWith("d")){
+    for (let j=0;j<idx;j++) sigma += 1.00*counts[GROUPS[j]];
+  } else {
+    const shellNum = n;
+    for (let j=0;j<idx;j++){
+      const gj = GROUPS[j];
+      const gshell = gj.endsWith("d") ? parseInt(gj) : parseInt(gj);
+      if (gshell === shellNum-1) sigma += 0.85*counts[gj];
+      else if (gshell <= shellNum-2) sigma += 1.00*counts[gj];
+    }
+  }
+  return Math.max(0.35, Z - sigma);
+}
+
+/* ============================== RADIAL WAVEFUNCTIONS ============================== */
+
+function laguerreShape(k, alpha, x){
+  switch(k){
+    case 0: return 1;
+    case 1: return -x + (alpha+1);
+    case 2: return x*x/2 - (alpha+2)*x + (alpha+1)*(alpha+2)/2;
+    case 3: return -x*x*x/6 + (alpha+3)*x*x/2 - (alpha+2)*(alpha+3)*x/2 + (alpha+1)*(alpha+2)*(alpha+3)/6;
+  }
+  return 0;
+}
+
+/* returns signed radial amplitude (shape only, unnormalized) */
+function radialAmplitude(n,l,Zeff,r){
+  const rho = (2*Zeff*r)/n;
+  const k = n-l-1, alpha = 2*l+1;
+  const L = laguerreShape(k, alpha, rho);
+  return Math.pow(rho,l) * L * Math.exp(-rho/2);
+}
+
+/* ============================== ANGULAR PARTS (real orbitals) ============================== */
+/* u=x/r, v=y/r, w=z/r */
+const ANGULAR = {
+  s:    { key:"s",       fn:(u,v,w)=>1 },
+  pz:   { key:"pz",      fn:(u,v,w)=>w },
+  px:   { key:"px",      fn:(u,v,w)=>u },
+  py:   { key:"py",      fn:(u,v,w)=>v },
+  dz2:  { key:"dz2",     fn:(u,v,w)=>(3*w*w-1) },
+  dxz:  { key:"dxz",     fn:(u,v,w)=>u*w },
+  dyz:  { key:"dyz",     fn:(u,v,w)=>v*w },
+  dx2y2:{ key:"dx2y2",   fn:(u,v,w)=>(u*u-v*v) },
+  dxy:  { key:"dxy",     fn:(u,v,w)=>u*v }
+};
+
+function orbitalsForSubshell(l){
+  if (l===0) return [{ml:0, name:"s", label:"s", ang:ANGULAR.s}];
+  if (l===1) return [
+    {ml:-1, name:"py", label:"p_y", ang:ANGULAR.py},
+    {ml:0,  name:"pz", label:"p_z", ang:ANGULAR.pz},
+    {ml:1,  name:"px", label:"p_x", ang:ANGULAR.px}
+  ];
+  return [
+    {ml:-2, name:"dxy",   label:"d_xy",    ang:ANGULAR.dxy},
+    {ml:-1, name:"dyz",   label:"d_yz",    ang:ANGULAR.dyz},
+    {ml:0,  name:"dz2",   label:"d_z\u00b2", ang:ANGULAR.dz2},
+    {ml:1,  name:"dxz",   label:"d_xz",    ang:ANGULAR.dxz},
+    {ml:2,  name:"dx2y2", label:"d_x\u00b2\u2212y\u00b2", ang:ANGULAR.dx2y2}
+  ];
+}
+
+/* ============================== POINT CLOUD SAMPLING ============================== */
+
+function samplePoints(n,l,Zeff,angFn,numPoints,posColor,negColor){
+  const box = Math.max(3.2, 4.6*n*n/Zeff);
+  function densityAt(x,y,z){
+    const r = Math.sqrt(x*x+y*y+z*z);
+    if (r<1e-6) return {d:0,sign:1};
+    const R = radialAmplitude(n,l,Zeff,r);
+    const A = angFn(x/r,y/r,z/r);
+    const psi = R*A;
+    return { d: psi*psi, sign: psi>=0?1:-1 };
+  }
+  let maxD = 1e-9;
+  for (let i=0;i<3500;i++){
+    const x=(Math.random()*2-1)*box, y=(Math.random()*2-1)*box, z=(Math.random()*2-1)*box;
+    const {d} = densityAt(x,y,z);
+    if (d>maxD) maxD = d;
+  }
+  maxD *= 1.2;
+  const positions = new Float32Array(numPoints*3);
+  const colors = new Float32Array(numPoints*3);
+  let got = 0, attempts = 0;
+  const maxAttempts = numPoints*220;
+  const pc = new THREE.Color(posColor), nc = new THREE.Color(negColor);
+  while (got<numPoints && attempts<maxAttempts){
+    attempts++;
+    const x=(Math.random()*2-1)*box, y=(Math.random()*2-1)*box, z=(Math.random()*2-1)*box;
+    const {d,sign} = densityAt(x,y,z);
+    if (d<=0) continue;
+    if (Math.random() < d/maxD){
+      positions[got*3]=x; positions[got*3+1]=y; positions[got*3+2]=z;
+      const c = sign>=0?pc:nc;
+      colors[got*3]=c.r; colors[got*3+1]=c.g; colors[got*3+2]=c.b;
+      got++;
+    }
+  }
+  return { positions: positions.subarray(0,got*3), colors: colors.subarray(0,got*3), box, count: got };
+}
+
+/* ============================== THREE.JS SETUP ============================== */
+
+const stage = document.getElementById("stage");
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(45, 1, 0.05, 500);
+const renderer = new THREE.WebGLRenderer({ antialias:true, alpha:false });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio||1, 2));
+stage.appendChild(renderer.domElement);
+renderer.setClearColor(0x05070d, 1);
+
+const worldGroup = new THREE.Group();
+scene.add(worldGroup);
+
+const ambient = new THREE.AmbientLight(0xffffff, 0.55);
+scene.add(ambient);
+const key = new THREE.PointLight(0x9fd8ff, 1.1, 0, 0);
+key.position.set(6,8,10);
+scene.add(key);
+const rim = new THREE.PointLight(0xff9d7a, 0.5, 0, 0);
+rim.position.set(-8,-4,-6);
+scene.add(rim);
+
+/* nucleus */
+const nucleusGroup = new THREE.Group();
+worldGroup.add(nucleusGroup);
+const nucleusMesh = new THREE.Mesh(
+  new THREE.SphereGeometry(0.42, 24, 24),
+  new THREE.MeshStandardMaterial({ color:0xffdca8, emissive:0xff7a3d, emissiveIntensity:0.55, roughness:0.35, metalness:0.1 })
+);
+nucleusGroup.add(nucleusMesh);
+const nucleusGlow = new THREE.PointLight(0xffb066, 1.0, 6, 2);
+nucleusGroup.add(nucleusGlow);
+
+/* camera orbit state */
+const orbit = { radius:9, theta:0.9, phi:1.15, target:new THREE.Vector3(0,0,0) };
+function updateCamera(){
+  const {radius, theta, phi, target} = orbit;
+  camera.position.set(
+    target.x + radius*Math.sin(phi)*Math.sin(theta),
+    target.y + radius*Math.cos(phi),
+    target.z + radius*Math.sin(phi)*Math.cos(theta)
+  );
+  camera.lookAt(target);
+}
+updateCamera();
+
+function resize(){
+  const w = stage.clientWidth, h = stage.clientHeight;
+  camera.aspect = w/Math.max(1,h);
+  camera.updateProjectionMatrix();
+  renderer.setSize(w,h,false);
+}
+window.addEventListener("resize", resize);
+new ResizeObserver(resize).observe(stage);
+resize();
+
+/* pointer controls: drag rotate + wheel/pinch zoom */
+const pointers = new Map();
+let dragging = false, lastX=0, lastY=0, lastPinchDist=null, idleTimer=0;
+
+function pinchDist(){
+  const pts = [...pointers.values()];
+  const dx = pts[0].x-pts[1].x, dy = pts[0].y-pts[1].y;
+  return Math.sqrt(dx*dx+dy*dy);
+}
+stage.addEventListener("pointerdown", e=>{
+  pointers.set(e.pointerId, {x:e.clientX, y:e.clientY});
+  stage.setPointerCapture(e.pointerId);
+  idleTimer = performance.now();
+  if (pointers.size===1){ dragging=true; lastX=e.clientX; lastY=e.clientY; }
+  else if (pointers.size===2){ dragging=false; lastPinchDist=pinchDist(); }
+});
+stage.addEventListener("pointermove", e=>{
+  if (!pointers.has(e.pointerId)) return;
+  pointers.set(e.pointerId, {x:e.clientX, y:e.clientY});
+  idleTimer = performance.now();
+  if (pointers.size===1 && dragging){
+    const dx = e.clientX-lastX, dy = e.clientY-lastY;
+    orbit.theta -= dx*0.0055;
+    orbit.phi = Math.min(Math.PI-0.12, Math.max(0.12, orbit.phi - dy*0.0055));
+    lastX=e.clientX; lastY=e.clientY;
+    updateCamera();
+  } else if (pointers.size===2){
+    const d = pinchDist();
+    if (lastPinchDist){
+      orbit.radius = Math.min(40, Math.max(2.2, orbit.radius * (lastPinchDist/d)));
+      updateCamera();
+    }
+    lastPinchDist = d;
+  }
+});
+function releasePointer(e){
+  pointers.delete(e.pointerId);
+  if (pointers.size===0){ dragging=false; lastPinchDist=null; }
+  else if (pointers.size===1){ dragging=true; const p=[...pointers.values()][0]; lastX=p.x; lastY=p.y; lastPinchDist=null; }
+}
+stage.addEventListener("pointerup", releasePointer);
+stage.addEventListener("pointercancel", releasePointer);
+stage.addEventListener("pointerleave", e=>{ if (e.pointerType!=='touch') releasePointer(e); });
+stage.addEventListener("wheel", e=>{
+  e.preventDefault();
+  orbit.radius = Math.min(40, Math.max(2.2, orbit.radius * (1 + e.deltaY*0.0012)));
+  updateCamera();
+  idleTimer = performance.now();
+}, { passive:false });
+
+/* ============================== STATE ============================== */
+
+let currentZ = 1;
+let currentConfig = buildConfig(1);
+let currentZeffCache = {};
+let viewMode = "shells"; // 'shells' | 'orbitals'
+let selectedSubshellIndex = 0;
+let selectedOrbitalKey = "ALL"; // 'ALL' or orbital name
+
+let shellObjects = [];   // three objects for shell view, cleared/rebuilt per element
+let orbitalPointsObj = null;
+let orbitalArrowObjs = [];
+let targetFrame = { radius: 9 };
+
+function computeZeffCache(config, Z){
+  const counts = groupCounts(config);
+  const cache = {};
+  config.forEach(s=>{ cache[s.label] = zEffFor(s.n, s.l, Z, counts); });
+  return cache;
+}
+
+/* ---- colors ---- */
+const COL = {
+  pos: 0x4c8dff, neg: 0xff7a59, s: 0x5ee6d9,
+  spinUp: 0xffd166, spinDown: 0xb892ff,
+  shellRing: 0x2a3550
+};
+
+/* ============================== SHELL VIEW BUILD ============================== */
+
+function fibonacciDir(i, N){
+  const golden = Math.PI*(3-Math.sqrt(5));
+  const y = 1 - (i/(Math.max(1,N-1)))*2;
+  const r = Math.sqrt(Math.max(0,1-y*y));
+  const theta = golden*i;
+  return new THREE.Vector3(Math.cos(theta)*r, y, Math.sin(theta)*r);
+}
+
+function makeSpinArrow(color, up){
+  const g = new THREE.Group();
+  const shaft = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.014,0.014,0.16,6),
+    new THREE.MeshBasicMaterial({ color })
+  );
+  shaft.position.y = 0.08;
+  const head = new THREE.Mesh(
+    new THREE.ConeGeometry(0.04,0.075,7),
+    new THREE.MeshBasicMaterial({ color })
+  );
+  head.position.y = 0.16+0.0375;
+  g.add(shaft, head);
+  if (!up) g.rotation.z = Math.PI;
+  return g;
+}
+
+function clearGroup(g){
+  while (g.children.length){ 
+    const c = g.children.pop();
+    if (c.geometry) c.geometry.dispose();
+    if (c.material) { if (Array.isArray(c.material)) c.material.forEach(m=>m.dispose()); else c.material.dispose(); }
+    clearGroup(c);
+  }
+}
+
+function buildShellView(){
+  shellObjects.forEach(o=>{ worldGroup.remove(o); clearGroup(o); });
+  shellObjects = [];
+
+  const shells = [...new Set(currentConfig.map(s=>s.n))].sort((a,b)=>a-b);
+  const zeff = currentZeffCache;
+
+  shells.forEach((n, shellIdx)=>{
+    const subs = currentConfig.filter(s=>s.n===n);
+    const repZeff = subs.reduce((acc,s)=>acc+zeff[s.label],0)/subs.length;
+    const radius = 1.35 + 1.55*(n*n/Math.max(1.1,repZeff))**0.42 + shellIdx*0.15;
+
+    const ringGeo = new THREE.TorusGeometry(radius, 0.006, 8, 96);
+    const ringMat = new THREE.MeshBasicMaterial({ color:COL.shellRing, transparent:true, opacity:0.55 });
+    const ring = new THREE.Mesh(ringGeo, ringMat);
+    ring.rotation.x = Math.PI/2 * 0.15 * (shellIdx%2===0?1:-1);
+    worldGroup.add(ring);
+    shellObjects.push(ring);
+
+    const sphGeo = new THREE.SphereGeometry(radius, 28, 20);
+    const sphMat = new THREE.MeshBasicMaterial({ color:COL.shellRing, wireframe:true, transparent:true, opacity:0.13 });
+    const sph = new THREE.Mesh(sphGeo, sphMat);
+    worldGroup.add(sph);
+    shellObjects.push(sph);
+
+    let totalE = subs.reduce((a,s)=>a+s.count,0);
+    let placed = 0;
+    subs.forEach((s, subIdx)=>{
+      const rr = radius + subIdx*0.22 - (subs.length-1)*0.11;
+      const slots = assignOrbitals(s.l, s.count);
+      let flat = [];
+      slots.forEach(sl=>sl.forEach(sp=>flat.push(sp)));
+      flat.forEach((spin, k)=>{
+        const dir = fibonacciDir(placed, totalE);
+        placed++;
+        const pos = dir.clone().multiplyScalar(rr);
+        const eMesh = new THREE.Mesh(
+          new THREE.SphereGeometry(0.085, 12, 12),
+          new THREE.MeshStandardMaterial({
+            color: spin>0?COL.spinUp:COL.spinDown,
+            emissive: spin>0?COL.spinUp:COL.spinDown,
+            emissiveIntensity:0.7, roughness:0.4
+          })
+        );
+        eMesh.position.copy(pos);
+        worldGroup.add(eMesh);
+        shellObjects.push(eMesh);
+
+        const arrow = makeSpinArrow(spin>0?COL.spinUp:COL.spinDown, spin>0);
+        arrow.position.copy(pos.clone().add(dir.clone().multiplyScalar(0.14)));
+        arrow.lookAt(pos.clone().add(dir));
+        arrow.rotateX(Math.PI/2);
+        worldGroup.add(arrow);
+        shellObjects.push(arrow);
+      });
+    });
+  });
+
+  const maxR = shells.length ? (1.35 + 1.55*(Math.max(...shells)**2/1.2)**0.42 + shells.length*0.2) : 4;
+  targetFrame.radius = Math.max(6, maxR*1.9);
+}
+
+/* ============================== ORBITAL VIEW BUILD ============================== */
+
+function clearOrbitalView(){
+  if (orbitalPointsObj){ worldGroup.remove(orbitalPointsObj); orbitalPointsObj.geometry.dispose(); orbitalPointsObj.material.dispose(); orbitalPointsObj=null; }
+  orbitalArrowObjs.forEach(o=>{ worldGroup.remove(o); clearGroup(o); });
+  orbitalArrowObjs = [];
+}
+
+function buildOrbitalView(){
+  clearOrbitalView();
+  const sub = currentConfig[selectedSubshellIndex];
+  if (!sub) return;
+  const Zeff = currentZeffCache[sub.label];
+  const orbs = orbitalsForSubshell(sub.l);
+  const slotsBySubshell = assignOrbitals(sub.l, sub.count); // index -> spins[]
+
+  const toShow = selectedOrbitalKey==="ALL" ? orbs : orbs.filter(o=>o.name===selectedOrbitalKey);
+
+  const allPos = [], allCol = [];
+  let maxBox = 3;
+
+  // Map orbitals in fixed ml order to slot occupation
+  orbs.forEach((orb, idx)=>{
+    if (selectedOrbitalKey!=="ALL" && orb.name!==selectedOrbitalKey) return;
+    const spins = slotsBySubshell[idx] || [];
+    const occupied = spins.length>0;
+    const perOrbitalPoints = occupied ? Math.round(2200/Math.max(1,toShow.length)) : Math.round(900/Math.max(1,toShow.length));
+    const res = samplePoints(sub.n, sub.l, Zeff, orb.ang.fn, Math.max(250,perOrbitalPoints),
+                              sub.l===0?COL.s:COL.pos, sub.l===0?COL.s:COL.neg);
+    maxBox = Math.max(maxBox, res.box);
+    const alpha = occupied ? 1 : 0.35;
+    for (let p=0;p<res.count;p++){
+      allPos.push(res.positions[p*3], res.positions[p*3+1], res.positions[p*3+2]);
+      allCol.push(res.colors[p*3]*alpha + (1-alpha)*0.15,
+                  res.colors[p*3+1]*alpha + (1-alpha)*0.15,
+                  res.colors[p*3+2]*alpha + (1-alpha)*0.18);
+    }
+    if (occupied){
+      const dirGuess = sub.l===0 ? new THREE.Vector3(0.7,0.7,0.7) :
+        (orb.name==="px"?new THREE.Vector3(1,0,0):orb.name==="py"?new THREE.Vector3(0,1,0):orb.name==="pz"?new THREE.Vector3(0,0,1):
+         orb.name==="dz2"?new THREE.Vector3(0,1,0):orb.name==="dxy"?new THREE.Vector3(0.7,0,0.7):
+         orb.name==="dxz"?new THREE.Vector3(0.7,0.7,0):orb.name==="dyz"?new THREE.Vector3(0,0.7,0.7):new THREE.Vector3(1,0.4,0));
+      const base = dirGuess.clone().normalize().multiplyScalar(res.box*0.62);
+      spins.forEach((spin, si)=>{
+        const arrow = makeSpinArrow(spin>0?COL.spinUp:COL.spinDown, spin>0);
+        arrow.scale.setScalar(1.4);
+        const off = base.clone().add(new THREE.Vector3((si-0.5)*0.35,0.3,0));
+        arrow.position.copy(off);
+        orbitalArrowObjs.push(arrow);
+        worldGroup.add(arrow);
+      });
+    }
+  });
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.Float32BufferAttribute(new Float32Array(allPos),3));
+  geo.setAttribute("color", new THREE.Float32BufferAttribute(new Float32Array(allCol),3));
+  const mat = new THREE.PointsMaterial({ size:0.05, vertexColors:true, transparent:true, opacity:0.88, sizeAttenuation:true, depthWrite:false, blending:THREE.AdditiveBlending });
+  orbitalPointsObj = new THREE.Points(geo, mat);
+  worldGroup.add(orbitalPointsObj);
+
+  targetFrame.radius = Math.max(3.4, maxBox*1.55);
+}
+
+/* ============================== UI WIRING ============================== */
+
+const elementRow = document.getElementById("elementRow");
+ELEMENTS.forEach(([Z,sym])=>{
+  const chip = document.createElement("div");
+  chip.className = "elChip" + (Z===1?" active":"");
+  chip.dataset.z = Z;
+  chip.innerHTML = `<span class="sym">${sym}</span><span class="z">${Z}</span>`;
+  chip.addEventListener("click", ()=>selectElement(Z));
+  elementRow.appendChild(chip);
+});
+
+function subshellSup(count){ return `<span class="sup">${count}</span>`; }
+
+function renderConfigUI(){
+  document.getElementById("configLine").innerHTML =
+    `<b>${ELEMENTS.find(e=>e[0]===currentZ)[2]}</b> (Z=${currentZ}) &middot; ` +
+    currentConfig.map(s=>`${s.label}${toSuperscript(s.count)}`).join(" ");
+
+  const row = document.getElementById("subshellRow");
+  row.innerHTML = "";
+  currentConfig.forEach((s, i)=>{
+    const chip = document.createElement("div");
+    chip.className = "subChip" + (i===selectedSubshellIndex?" active":"");
+    chip.innerHTML = `${s.label}${subshellSup(s.count)}`;
+    chip.addEventListener("click", ()=>{
+      selectedSubshellIndex = i;
+      selectedOrbitalKey = "ALL";
+      renderConfigUI();
+      renderQnumTable();
+      if (viewMode==="orbitals") buildOrbitalView();
+      pulseShell(i);
+    });
+    row.appendChild(chip);
+  });
+
+  const orow = document.getElementById("orbitalRow");
+  const sub = currentConfig[selectedSubshellIndex];
+  if (viewMode==="orbitals" && sub && sub.l>0){
+    orow.style.display = "flex";
+    orow.innerHTML = "";
+    const allChip = document.createElement("div");
+    allChip.className = "orbChip" + (selectedOrbitalKey==="ALL"?" active":"");
+    allChip.textContent = "All";
+    allChip.addEventListener("click", ()=>{ selectedOrbitalKey="ALL"; renderConfigUI(); buildOrbitalView(); });
+    orow.appendChild(allChip);
+    const slots = assignOrbitals(sub.l, sub.count);
+    orbitalsForSubshell(sub.l).forEach((orb, idx)=>{
+      const occ = (slots[idx]||[]).length>0;
+      const chip = document.createElement("div");
+      chip.className = "orbChip" + (selectedOrbitalKey===orb.name?" active":"") + (occ?"":" empty");
+      chip.innerHTML = `<span class="dot" style="background:${sub.l===0?'#5ee6d9':'#4c8dff'}"></span>${orb.label}`;
+      chip.addEventListener("click", ()=>{ selectedOrbitalKey=orb.name; renderConfigUI(); buildOrbitalView(); });
+      orow.appendChild(chip);
+    });
+  } else {
+    orow.style.display = "none";
+  }
+}
+
+function toSuperscript(n){
+  const map = {"0":"\u2070","1":"\u00b9","2":"\u00b2","3":"\u00b3","4":"\u2074","5":"\u2075","6":"\u2076","7":"\u2077","8":"\u2078","9":"\u2079"};
+  return String(n).split("").map(c=>map[c]).join("");
+}
+
+function pulseShell(subIdx){
+  // brief highlight not essential; placeholder for future extension
+}
+
+function renderQnumTable(){
+  const sub = currentConfig[selectedSubshellIndex];
+  const wrap = document.getElementById("qnumWrap");
+  if (!sub){ wrap.innerHTML = "<p>No subshell selected.</p>"; return; }
+  const slots = assignOrbitals(sub.l, sub.count);
+  const orbs = orbitalsForSubshell(sub.l);
+  let rows = "";
+  orbs.forEach((orb,i)=>{
+    (slots[i]||[]).forEach(spin=>{
+      rows += `<tr><td>${sub.n}</td><td>${sub.l}</td><td>${orb.ml}</td><td>${spin>0?"+1/2":"\u22121/2"}</td><td>${orb.label}</td></tr>`;
+    });
+  });
+  wrap.innerHTML = `
+    <table class="qtable">
+      <tr><th>n</th><th>l</th><th>m<sub>l</sub></th><th>m<sub>s</sub></th><th>orbital</th></tr>
+      ${rows || `<tr><td colspan="5">empty subshell</td></tr>`}
+    </table>
+    <p style="margin-top:10px">Effective nuclear charge for ${sub.label} (Slater's rules): <b style="color:var(--text)">Z<sub>eff</sub> \u2248 ${currentZeffCache[sub.label].toFixed(2)}</b></p>
+  `;
+}
+
+function selectElement(Z){
+  currentZ = Z;
+  currentConfig = buildConfig(Z);
+  currentZeffCache = computeZeffCache(currentConfig, Z);
+  selectedSubshellIndex = 0;
+  selectedOrbitalKey = "ALL";
+  [...elementRow.children].forEach(c=>c.classList.toggle("active", parseInt(c.dataset.z)===Z));
+  renderConfigUI();
+  renderQnumTable();
+  refreshScene();
+}
+
+function refreshScene(){
+  clearOrbitalView();
+  shellObjects.forEach(o=>{ worldGroup.remove(o); clearGroup(o); });
+  shellObjects = [];
+  if (viewMode==="shells"){
+    buildShellView();
+  } else {
+    buildOrbitalView();
+  }
+  updateNodeReadout();
+}
+
+function updateNodeReadout(){
+  const sub = currentConfig[selectedSubshellIndex];
+  const el = document.getElementById("nodeReadout");
+  if (viewMode==="shells"){
+    const totalE = currentConfig.reduce((a,s)=>a+s.count,0);
+    el.innerHTML = `<b>${ELEMENTS.find(e=>e[0]===currentZ)[1]}</b> &middot; ${totalE} electrons<div class="legendRow"><span class="swatch" style="background:#ffd166"></span>spin up<span style="width:6px"></span><span class="swatch" style="background:#b892ff"></span>spin down</div>`;
+  } else if (sub){
+    const nodes = Math.max(0, sub.n - sub.l - 1);
+    el.innerHTML = `<b>${sub.label}</b> orbital &middot; ${nodes} radial node${nodes===1?"":"s"}<div class="legendRow"><span class="swatch" style="background:#4c8dff"></span>&psi;&gt;0<span style="width:6px"></span><span class="swatch" style="background:#ff7a59"></span>&psi;&lt;0</div>`;
+  }
+}
+
+document.getElementById("btnShells").addEventListener("click", ()=>{
+  viewMode="shells";
+  document.getElementById("btnShells").classList.add("active");
+  document.getElementById("btnOrbitals").classList.remove("active");
+  renderConfigUI();
+  refreshScene();
+});
+document.getElementById("btnOrbitals").addEventListener("click", ()=>{
+  viewMode="orbitals";
+  document.getElementById("btnOrbitals").classList.add("active");
+  document.getElementById("btnShells").classList.remove("active");
+  renderConfigUI();
+  refreshScene();
+});
+
+document.getElementById("infoBtn").addEventListener("click", ()=>{
+  document.getElementById("infoDrawer").classList.add("open");
+});
+document.getElementById("closeInfo").addEventListener("click", ()=>{
+  document.getElementById("infoDrawer").classList.remove("open");
+});
+document.getElementById("infoDrawer").addEventListener("click", e=>{
+  if (e.target.id==="infoDrawer") e.currentTarget.classList.remove("open");
+});
+
+/* ============================== ANIMATE ============================== */
+
+function animate(t){
+  requestAnimationFrame(animate);
+  const idle = performance.now()-idleTimer > 700;
+  if (idle && !dragging){
+    orbit.theta += 0.0016;
+  }
+  orbit.radius += (targetFrame.radius - orbit.radius)*0.06;
+  updateCamera();
+  nucleusMesh.rotation.y += 0.003;
+  renderer.render(scene, camera);
+}
+
+/* ============================== INIT ============================== */
+
+selectElement(1);
+requestAnimationFrame(animate);
+
+})();
+</script>
+</body>
+</html>
